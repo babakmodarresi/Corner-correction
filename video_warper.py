@@ -4,6 +4,7 @@ import numpy as np
 import json
 import os
 import glob
+import setup_corners
 
 
 # --- Configuration ---
@@ -49,6 +50,11 @@ def main():
     pygame.mouse.set_visible(False)
 
     usb_videos = find_usb_video_files()
+    if not usb_videos:
+        print("No USB video found. Launching corner setup...")
+        setup_corners.main()
+        usb_videos = find_usb_video_files()
+
     if usb_videos:
         video_path = usb_videos[0]
         print(f"Using USB video: {video_path}")
