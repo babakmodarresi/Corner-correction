@@ -3,11 +3,15 @@ import cv2
 import numpy as np
 import json
 import os
+import shutil
+import subprocess
 
 
 # --- Configuration ---
 VIDEO_PATH = "2.mp4"
 CORNERS_FILE = "corners.json"
+# USB mount prefixes used for copying the corners file after it is loaded
+USB_MOUNT_POINTS_PREFIX = ["/media/"]
 
 
 def load_corners():
@@ -17,6 +21,17 @@ def load_corners():
    except (FileNotFoundError, json.JSONDecodeError):
        print(f"Warning: Could not read {CORNERS_FILE}. Will try again.")
        return None
+
+
+def find_usb_root():
+   """Return the path to the first detected USB mount or None."""
+   for prefix in USB_MOUNT_POINTS_PREFIX:
+       if os.path.exists(prefix):
+           for name in os.listdir(prefix):
+               usb_path = os.path.join(prefix, name)
+               if os.path.isdir(usb_path):
+                   return usb_path
+   return None
 
 
 def main():
@@ -39,8 +54,23 @@ def main():
    video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
    video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+   corners = load_corners()
+   if not corners:
+      subprocess.run(["python3", "setup_corners.py"])
+      corners = load_corners()
+      if not corners:
+         print("Error: Could not load corners even after running setup.")
+         pygame.quit()
+         return
 
-   corners = None
+   usb_root = find_usb_root()
+   if usb_root:
+      try:
+         shutil.copyfile(CORNERS_FILE, os.path.join(usb_root, CORNERS_FILE))
+         print(f"Copied {CORNERS_FILE} to {usb_root}")
+      except Exception as e:
+         print(f"Warning: failed to copy corners to USB: {e}")
+
    running = True
    clock = pygame.time.Clock()
 
@@ -103,6 +133,6 @@ def main():
 
 
 if __name__ == "__main__":
-   # TO DO: ADD USB AUTOMOUNT LOGIC!!
-   main()
+    # Corners are copied to a USB drive if one is detected
+    main()
 
