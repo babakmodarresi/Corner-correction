@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import json
 import os
+import glob
 import hashlib
 import tempfile
 import time
@@ -11,8 +12,10 @@ from gpiozero import MotionSensor
 
 
 # --- Configuration ---
-VIDEO_PATH = "2.mp4"
+DEFAULT_VIDEO_FILE = "2.mp4"
 CORNERS_FILE = "corners.json"
+USB_MOUNT_POINTS_PREFIX = ["/media/"]
+VIDEO_EXTENSIONS = ["*.mp4", "*.avi", "*.mkv", "*.mov"]
 CACHE_DIR = tempfile.gettempdir()
 MOTION_PIN = 10
 NO_MOTION_TIMEOUT = 2.0
@@ -28,6 +31,20 @@ def load_corners():
    except (FileNotFoundError, json.JSONDecodeError):
        print(f"Warning: Could not read {CORNERS_FILE}. Will try again.")
        return None
+
+
+def find_usb_video_files():
+    """Search USB drives for video files."""
+    for prefix in USB_MOUNT_POINTS_PREFIX:
+        if os.path.exists(prefix):
+            for root_dir in os.listdir(prefix):
+                usb_path = os.path.join(prefix, root_dir)
+                if os.path.isdir(usb_path):
+                    for ext in VIDEO_EXTENSIONS:
+                        files = glob.glob(os.path.join(usb_path, "**", ext), recursive=True)
+                        if files:
+                            return files
+    return []
 
 
 def preprocess_video(video_path, screen_width, screen_height, corners):
@@ -89,9 +106,17 @@ def main():
         pygame.quit()
         return
 
+    usb_videos = find_usb_video_files()
+    video_path = DEFAULT_VIDEO_FILE
+    if usb_videos:
+        video_path = usb_videos[0]
+        print(f"Using USB video: {video_path}")
+    else:
+        print(f"Using default video: {video_path}")
+
     try:
         warped_path = preprocess_video(
-            VIDEO_PATH, screen_width, screen_height, corners
+            video_path, screen_width, screen_height, corners
         )
     except IOError as e:
         print(e)
@@ -159,6 +184,5 @@ def main():
 
 
 if __name__ == "__main__":
-   # TO DO: ADD USB AUTOMOUNT LOGIC!!
-   main()
+    main()
 
