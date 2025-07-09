@@ -79,7 +79,7 @@ def main():
     info = pygame.display.Info()
     screen_width, screen_height = info.current_w, info.current_h
     print(f"Pygame screen initialized at: {screen_width}x{screen_height}")
-    screen = pygame.display.set_mode((screen_width, screen_height))
+    screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
     pygame.display.set_caption("Warped Video Player")
     pygame.mouse.set_visible(False)
 
@@ -103,7 +103,17 @@ def main():
     media = instance.media_new(warped_path)
     player.set_media(media)
     player.audio_set_volume(MAX_VOLUME)
+
+    window_info = pygame.display.get_wm_info().get("window")
+    if window_info:
+        # Direct VLC output to the same window created by pygame
+        try:
+            player.set_xwindow(window_info)
+        except AttributeError:
+            player.set_hwnd(window_info)
+
     player.play()
+    time.sleep(1)  # allow VLC time to start
 
     pir = MotionSensor(MOTION_PIN)
     last_motion = time.time()
@@ -112,7 +122,9 @@ def main():
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 36)
 
-    while running and player.is_playing():
+    while running:
+        if not player.is_playing():
+            break
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
