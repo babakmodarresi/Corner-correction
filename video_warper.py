@@ -8,11 +8,11 @@ import hashlib
 import tempfile
 import time
 import vlc
+import subprocess
 from gpiozero import MotionSensor
 
 
 # --- Configuration ---
-DEFAULT_VIDEO_FILE = "2.mp4"
 CORNERS_FILE = "corners.json"
 USB_MOUNT_POINTS_PREFIX = ["/media/"]
 VIDEO_EXTENSIONS = ["*.mp4", "*.avi", "*.mkv", "*.mov"]
@@ -24,17 +24,18 @@ MAX_VOLUME = 100
 VOLUME_STEP = 5
 
 
-def load_corners():
-   try:
-       with open(CORNERS_FILE, 'r') as f:
-           return json.load(f)
-   except (FileNotFoundError, json.JSONDecodeError):
-       print(f"Warning: Could not read {CORNERS_FILE}. Will try again.")
-       return None
+def load_corners(path=CORNERS_FILE):
+    """Load the corner configuration from a given path."""
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print(f"Warning: Could not read {path}.")
+        return None
 
 
-def find_usb_video_files():
-    """Search USB drives for video files."""
+def find_usb_video():
+    """Return the first USB mount point with a video file."""
     for prefix in USB_MOUNT_POINTS_PREFIX:
         if os.path.exists(prefix):
             for root_dir in os.listdir(prefix):
@@ -43,8 +44,8 @@ def find_usb_video_files():
                     for ext in VIDEO_EXTENSIONS:
                         files = glob.glob(os.path.join(usb_path, "**", ext), recursive=True)
                         if files:
-                            return files
-    return []
+                            return usb_path, files[0]
+    return None, None
 
 
 def preprocess_video(video_path, screen_width, screen_height, corners):
@@ -100,19 +101,21 @@ def main():
     pygame.display.set_caption("Warped Video Player")
     pygame.mouse.set_visible(False)
 
-    corners = load_corners()
-    if not corners:
-        print("No corner configuration found.")
+    usb_root, video_path = find_usb_video()
+    if not video_path:
+        print("No USB video found. Launching corner setup.")
         pygame.quit()
+        subprocess.run(["python3", "setup_corners.py"])
         return
 
-    usb_videos = find_usb_video_files()
-    video_path = DEFAULT_VIDEO_FILE
-    if usb_videos:
-        video_path = usb_videos[0]
-        print(f"Using USB video: {video_path}")
-    else:
-        print(f"Using default video: {video_path}")
+    corners = load_corners(os.path.join(usb_root, CORNERS_FILE))
+    if not corners:
+        print("No corner configuration found on USB.")
+        pygame.quit()
+        subprocess.run(["python3", "setup_corners.py"])
+        return
+
+    print(f"Using USB video: {video_path}")
 
     try:
         warped_path = preprocess_video(
