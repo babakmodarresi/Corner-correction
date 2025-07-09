@@ -3,20 +3,46 @@ import cv2
 import numpy as np
 import json
 import os
+import glob
 
 
 # --- Configuration ---
 VIDEO_PATH = "2.mp4"
 CORNERS_FILE = "corners.json"
+USB_MOUNT_POINTS_PREFIX = ["/media/"]
+VIDEO_EXTENSIONS = ["*.mp4", "*.avi", "*.mkv", "*.mov"]
 
 
 def load_corners():
-   try:
-       with open(CORNERS_FILE, 'r') as f:
-           return json.load(f)
-   except (FileNotFoundError, json.JSONDecodeError):
-       print(f"Warning: Could not read {CORNERS_FILE}. Will try again.")
-       return None
+    try:
+        with open(CORNERS_FILE, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print(f"Warning: Could not read {CORNERS_FILE}. Will try again.")
+        return None
+
+
+def find_usb_video_files():
+    """Return the first video file found on mounted USB drives."""
+    for prefix in USB_MOUNT_POINTS_PREFIX:
+        if os.path.exists(prefix):
+            for root_dir in os.listdir(prefix):
+                usb_path = os.path.join(prefix, root_dir)
+                if os.path.isdir(usb_path):
+                    for ext in VIDEO_EXTENSIONS:
+                        files = glob.glob(os.path.join(usb_path, "**", ext), recursive=True)
+                        if files:
+                            return files[0]
+    return None
+
+
+def preprocess_video(video_path: str):
+    """Open the given video path and return a capture object."""
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Could not open video file at {video_path}")
+        return None
+    return cap
 
 
 def main():
@@ -29,9 +55,11 @@ def main():
    pygame.mouse.set_visible(False)
 
 
-   cap = cv2.VideoCapture(VIDEO_PATH)
-   if not cap.isOpened():
-       print(f"Error: Could not open video file at {VIDEO_PATH}")
+   usb_video = find_usb_video_files()
+   video_source = usb_video if usb_video else VIDEO_PATH
+
+   cap = preprocess_video(video_source)
+   if cap is None:
        pygame.quit()
        return
 
@@ -59,7 +87,9 @@ def main():
        if not ret:
            print("End of video. Looping...")
            cap.release()
-           cap = cv2.VideoCapture(VIDEO_PATH)
+           cap = preprocess_video(video_source)
+           if cap is None:
+               break
            continue
 
 
@@ -103,6 +133,5 @@ def main():
 
 
 if __name__ == "__main__":
-   # TO DO: ADD USB AUTOMOUNT LOGIC!!
    main()
 
