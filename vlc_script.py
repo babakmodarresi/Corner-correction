@@ -3,7 +3,8 @@ from gpiozero import MotionSensor
 import vlc
 import time
 import os
-import glob # Added for finding files matching a pattern
+import glob  # Added for finding files matching a pattern
+import subprocess
 
 
 pir = MotionSensor(10) # Assuming GPIO10, adjust if different
@@ -16,7 +17,6 @@ last_motion = time.time()
 
 
 # --- Configuration ---
-DEFAULT_VIDEO_FILE = "/home/noorderlicht/video.mp4"
 USB_MOUNT_POINTS_PREFIX = ["/media/"]
 VIDEO_EXTENSIONS = ["*.mp4", "*.avi", "*.mkv", "*.mov"]
 NO_MOTION_TIMEOUT = 2.0
@@ -102,19 +102,17 @@ if __name__ == "__main__":
    try:
        while True:
            usb_videos = find_usb_video_files()
-           video_to_play = DEFAULT_VIDEO_FILE
-
 
            if usb_videos:
                video_to_play = usb_videos[0]
                print(f"💡 USB video: {video_to_play}")
+               play_video(video_to_play)
+               print("--- Loop restarting ---")
+               time.sleep(1)
            else:
-               print(f"💡 default video: {video_to_play}")
-
-
-           play_video(video_to_play)
-           print("--- Loop restarting ---")
-           time.sleep(1)
+               print("⚠️ No USB video found. Starting corner setup.")
+               subprocess.run(["python3", "setup_corners.py"])
+               break
 
 
    except KeyboardInterrupt:
